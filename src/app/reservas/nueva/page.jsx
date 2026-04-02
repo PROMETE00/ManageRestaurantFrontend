@@ -1,15 +1,24 @@
 'use client';
 
+import { api } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import SidebarNavegacionAdmin from '@/components/SideBarNavegacionAdmin';
-import SidebarNavegacionEmpleado from '@/components/SideBarNavegacionEmpleado';
+import { Calendar, Clock, Users, MapPin, ChevronLeft, Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Navbar } from '@/components/layout/Navbar';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 export default function NuevaReserva() {
   const router = useRouter();
+  const [usuario, setUsuario] = useState(null);
+  const [mesas, setMesas] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   const [form, setForm] = useState({
     nombre: '',
@@ -17,46 +26,45 @@ export default function NuevaReserva() {
     hora: '',
     pax: 1,
     mesa: '',
-    zona: 'Comedor', // Default zone
+    zona: 'Comedor',
   });
 
-  const [mesas, setMesas] = useState([]);
-  const [usuario, setUsuario] = useState(null);
-
   useEffect(() => {
-    // Verificar si hay usuario logueado
     const userJson = localStorage.getItem('usuario');
     if (userJson) {
       setUsuario(JSON.parse(userJson));
     } else {
-      // Redirigir a login si no hay usuario
       router.push('/login');
     }
   }, [router]);
 
   useEffect(() => {
-    axios
-      .get('http://localhost:8080/api/mesas')
+    api.get('/mesas')
       .then(res => setMesas(res.data))
       .catch(err => console.error('Error al cargar mesas:', err));
   }, []);
 
-  const handleChange = e => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError('');
 
     try {
-      const clienteRes = await axios.post('http://localhost:8080/api/clientes', {
+      // 1. Crear o buscar cliente (simplificado)
+      const clienteRes = await api.post('/clientes', {
         nombre: form.nombre,
-        telefono: '000-000-0000', // Placeholder phone number
+        telefono: '000-000-0000',
       });
 
       const clienteId = clienteRes.data.id;
 
-      await axios.post('http://localhost:8080/api/reservas', {
+      // 2. Crear reserva
+      await api.post('/reservas', {
         fecha: form.fecha,
         hora: form.hora,
         cantidad: parseInt(form.pax),
@@ -64,131 +72,193 @@ export default function NuevaReserva() {
         mesa: { id: parseInt(form.mesa) },
       });
 
-      alert('✅ Reserva creada correctamente');
-      router.push('/pagina'); // Redirige a la página de reservas
+      setSuccess(true);
+      setTimeout(() => {
+        router.push('/pagina');
+      }, 2000);
     } catch (err) {
       console.error('❌ Error al crear reserva:', err);
-      alert('Error al crear reserva');
+      setError('No se pudo crear la reserva. Por favor, verifica los datos.');
+      setIsLoading(false);
     }
   };
 
-  if (!usuario) {
-    return <div>Cargando...</div>; // Mostrar loading hasta que se valide el usuario
-  }
+  if (!usuario) return null;
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-[#1f2a37] to-[#111827] p-6">
-      <div className="w-full max-w-2xl bg-[#2b3748] rounded-2xl shadow-2xl p-10 text-white space-y-6 transition-all duration-300 hover:shadow-xl">
-        {/* Sidebar dependiendo del rol */}
-        {usuario.rol === 'admin' ? <SidebarNavegacionAdmin /> : <SidebarNavegacionEmpleado />}
+    <div className="min-h-screen bg-background flex flex-col">
+      <Navbar usuario={usuario} />
+      
+      <div className="flex flex-1 relative">
+        <Sidebar role={usuario.rol} />
 
-        <h1 className="text-3xl font-bold text-center text-yellow-500 mb-6">Crear Nueva Reserva</h1>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Nombre */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Nombre del Cliente</label>
-            <input
-              type="text"
-              name="nombre"
-              value={form.nombre}
-              onChange={handleChange}
-              required
-              className="w-full bg-gray-800 px-4 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            />
-          </div>
-
-          {/* Fecha */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Fecha de Reserva</label>
-            <input
-              type="date"
-              name="fecha"
-              value={form.fecha}
-              onChange={handleChange}
-              required
-              className="w-full bg-gray-800 px-4 py-2 rounded-md text-white"
-            />
-          </div>
-
-          {/* Hora */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Hora</label>
-            <input
-              type="time"
-              name="hora"
-              value={form.hora}
-              onChange={handleChange}
-              required
-              className="w-full bg-gray-800 px-4 py-2 rounded-md text-white"
-            />
-          </div>
-
-          {/* Número de Personas */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Número de Personas</label>
-            <input
-              type="number"
-              name="pax"
-              min="1"
-              value={form.pax}
-              onChange={handleChange}
-              required
-              className="w-full bg-gray-800 px-4 py-2 rounded-md text-white"
-            />
-          </div>
-
-          {/* Mesa */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Mesa</label>
-            <select
-              name="mesa"
-              value={form.mesa}
-              onChange={handleChange}
-              required
-              className="w-full bg-gray-800 px-4 py-2 rounded-md text-white"
-            >
-              <option value="">Selecciona una mesa</option>
-              {mesas.map(mesa => (
-                <option key={mesa.id} value={mesa.id}>
-                  {`Mesa ${mesa.numero} (${mesa.ubicacion}) - Capacidad: ${mesa.capacidad} personas`}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Zona */}
-          <div>
-            <label className="block text-sm font-semibold mb-1">Zona</label>
-            <select
-              name="zona"
-              value={form.zona}
-              onChange={handleChange}
-              className="w-full bg-gray-800 px-4 py-2 rounded-md text-white"
-            >
-              <option value="Comedor">Comedor</option>
-              <option value="Terraza">Terraza</option>
-              <option value="Barra">Barra</option>
-            </select>
-          </div>
-
-          {/* Botones */}
-          <div className="flex justify-between mt-6 space-x-4">
-            <Button
-              type="button"
+        <main className="flex-1 p-8 lg:p-12 overflow-auto">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-3xl mx-auto"
+          >
+            {/* Back Button */}
+            <button 
               onClick={() => router.back()}
-              className="bg-gray-600 hover:bg-gray-700 text-white"
+              className="flex items-center gap-2 text-zinc-500 hover:text-primary transition-colors mb-6 group"
             >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
-            >
-              Guardar Reserva
-            </Button>
-          </div>
-        </form>
+              <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+              <span className="text-sm font-medium">Volver</span>
+            </button>
+
+            <div className="mb-10 text-center">
+              <h1 className="text-4xl font-bold text-white mb-3">Nueva Reserva</h1>
+              <p className="text-zinc-400">Completa los detalles para agendar una nueva mesa.</p>
+            </div>
+
+            <Card className="glass-effect border-white/10 p-8 md:p-12 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
+              
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-sm"
+                  >
+                    <AlertCircle size={20} />
+                    {error}
+                  </motion.div>
+                )}
+
+                {success && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="mb-8 p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col items-center gap-3 text-emerald-400 text-center"
+                  >
+                    <CheckCircle2 size={40} className="mb-2" />
+                    <h3 className="font-bold text-lg">Reserva Confirmada</h3>
+                    <p className="text-sm opacity-80 text-emerald-300">La reserva se ha registrado correctamente. Redirigiendo...</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <form onSubmit={handleSubmit} className="space-y-8">
+                {/* Cliente Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Users size={18} />
+                    <h3 className="text-xs font-bold uppercase tracking-[0.2em]">Información del Cliente</h3>
+                  </div>
+                  <Input
+                    label="Nombre Completo"
+                    name="nombre"
+                    placeholder="Ej: Sofía Martínez"
+                    value={form.nombre}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="h-px bg-white/5 w-full" />
+
+                {/* Detalles Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Calendar size={18} />
+                    <h3 className="text-xs font-bold uppercase tracking-[0.2em]">Detalles de la Reserva</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Input
+                      label="Fecha"
+                      type="date"
+                      name="fecha"
+                      value={form.fecha}
+                      onChange={handleChange}
+                      required
+                    />
+                    <Input
+                      label="Hora"
+                      type="time"
+                      name="hora"
+                      value={form.hora}
+                      onChange={handleChange}
+                      required
+                    />
+                    <Input
+                      label="Número de Personas (Pax)"
+                      type="number"
+                      name="pax"
+                      min="1"
+                      value={form.pax}
+                      onChange={handleChange}
+                      required
+                    />
+                    
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-zinc-400 ml-1 uppercase tracking-wider flex items-center gap-1.5">
+                        <MapPin size={12} /> Zona Preferida
+                      </label>
+                      <select
+                        name="zona"
+                        value={form.zona}
+                        onChange={handleChange}
+                        className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-primary/40 focus:outline-none appearance-none cursor-pointer transition-all"
+                      >
+                        <option value="Comedor">Comedor Principal</option>
+                        <option value="Terraza">Terraza Jardín</option>
+                        <option value="Barra">Barra Lounge</option>
+                        <option value="VIP">Zona Privada (VIP)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-zinc-400 ml-1 uppercase tracking-wider">
+                      Seleccionar Mesa Disponible
+                    </label>
+                    <select
+                      name="mesa"
+                      value={form.mesa}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-primary/40 focus:outline-none appearance-none cursor-pointer transition-all"
+                    >
+                      <option value="">-- Elige una mesa --</option>
+                      {mesas.map(mesa => (
+                        <option key={mesa.id} value={mesa.id} className="bg-zinc-900">
+                          {`Mesa ${mesa.numero} (${mesa.ubicacion}) - Capacidad: ${mesa.capacidad} pax`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="pt-6 flex gap-4">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => router.back()}
+                    className="flex-1 py-6"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-[2] py-6"
+                    disabled={isLoading || success}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="animate-spin mr-2" size={20} />
+                    ) : (
+                      <Save className="mr-2" size={20} />
+                    )}
+                    {isLoading ? 'Guardando...' : 'Confirmar Reserva'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </motion.div>
+        </main>
       </div>
     </div>
   );
