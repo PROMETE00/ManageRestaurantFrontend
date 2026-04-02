@@ -1,227 +1,264 @@
 'use client';
 
+import { api } from '@/lib/api';
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
-import { FaSortAlphaDown, FaSortAlphaUp, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa';
-import SidebarNavegacionAdmin from '@/components/SideBarNavegacionAdmin';
-import SidebarNavegacionEmpleado from '@/components/SideBarNavegacionEmpleado';
+import { 
+  Search, 
+  ArrowUpDown, 
+  Clock, 
+  User, 
+  MapPin, 
+  Users, 
+  Calendar as CalendarIcon,
+  Filter,
+  Plus,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Navbar } from '@/components/layout/Navbar';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { clsx } from 'clsx';
 
-export default function DashboardRestaurante() {
+export default function ReservasListado() {
   const [reservas, setReservas] = useState([]);
-  const [filtro, setFiltro] = useState('');      // texto para buscar
-  const [sortField, setSortField] = useState('hora'); // 'hora' o 'nombre'
+  const [filtro, setFiltro] = useState('');
+  const [sortField, setSortField] = useState('hora');
   const [sortAsc, setSortAsc] = useState(true);
   const [usuario, setUsuario] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Verificar si el usuario está autenticado
   useEffect(() => {
-    const user = localStorage.getItem('usuario');
-    if (!user) {
-      // Si no hay usuario logueado, redirigir al login
+    const userJson = localStorage.getItem('usuario');
+    if (!userJson) {
       router.push('/login');
       return;
     }
-    setUsuario(JSON.parse(user));
+    const user = JSON.parse(userJson);
+    setUsuario(user);
+    setIsLoading(false);
   }, [router]);
 
-  // Si el rol no es admin o empleado, redirige a una página restringida
-  if (usuario && usuario.rol !== 'admin' && usuario.rol !== 'empleado') {
-    return (
-      <div className="min-h-screen bg-[#1f2a37] text-white flex items-center justify-center">
-        <h1 className="text-2xl font-bold text-yellow-400">Acceso restringido. Solo administradores y empleados pueden ver esta página.</h1>
-      </div>
-    );
-  }
-
-  // ──── Carga inicial de datos ────
   useEffect(() => {
-    axios
-      .get('http://localhost:8080/api/reservas')
+    api.get('/reservas')
       .then(res => {
         const data = res.data.map(r => ({
           id: r.id,
-          hora: r.hora?.slice(0, 5) + 'h',            // ej. "14:30h"
+          hora: r.hora?.slice(0, 5),
           pax: r.cantidad,
           mesa: r.mesa?.numero ?? '—',
           zona: r.mesa?.ubicacion ?? 'Desconocida',
           nombre: r.cliente?.nombre ?? 'Sin nombre',
-          fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-MX') : '—',
+          fecha: r.fecha ? new Date(r.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
         }));
         setReservas(data);
       })
       .catch(err => console.error('Error al obtener reservas:', err));
   }, []);
 
-  // ──── Filtrado por texto ────
   const reservasFiltradas = useMemo(() => {
-    if (!filtro.trim()) return reservas;
-    const term = filtro.toLowerCase();
     return reservas.filter(r =>
-      r.nombre.toLowerCase().includes(term) ||
-      r.mesa.toString().includes(term)
+      r.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
+      r.mesa.toString().includes(filtro)
     );
   }, [reservas, filtro]);
 
-  // ──── Ordenamiento ────
   const reservasOrdenadas = useMemo(() => {
     return [...reservasFiltradas].sort((a, b) => {
       let valA = a[sortField];
       let valB = b[sortField];
 
-      // Si ordenamos por hora (convertir "HH:MMh" → número HHMM)
       if (sortField === 'hora') {
-        const parseHora = h => {
-          if (!h) return 0;
-          const [hh, mm] = h.replace('h', '').split(':').map(x => parseInt(x, 10));
-          return hh * 100 + mm;
-        };
-        valA = parseHora(valA);
-        valB = parseHora(valB);
+        valA = parseInt((valA || '00:00').replace(':', ''), 10);
+        valB = parseInt((valB || '00:00').replace(':', ''), 10);
       }
 
-      // Si ordenamos por nombre (cadena)
-      if (sortField === 'nombre') {
-        return sortAsc
-          ? valA.localeCompare(valB, 'es')
-          : valB.localeCompare(valA, 'es');
+      if (typeof valA === 'string') {
+        return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
       }
 
-      // Si ordenamos por mesa o pax (numérico)
-      if (sortField === 'mesa' || sortField === 'pax') {
-        valA = Number(valA) || 0;
-        valB = Number(valB) || 0;
-      }
-
-      // Comparación numérica genérica
       return sortAsc ? valA - valB : valB - valA;
     });
   }, [reservasFiltradas, sortField, sortAsc]);
 
-  // ──── Cambiar dirección de orden (ascendente/descendente) ────
-  const toggleSortDirection = () => setSortAsc(prev => !prev);
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+  };
+
+  if (isLoading) return null;
+
+  if (usuario && usuario.rol !== 'admin' && usuario.rol !== 'empleado') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6 text-center">
+        <Card className="max-w-md p-10 border-red-500/20 glass-effect">
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Filter className="text-red-500" size={40} />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-2">Acceso Restringido</h1>
+          <p className="text-zinc-400 mb-8">Solo el personal autorizado puede acceder a esta sección.</p>
+          <Button onClick={() => router.push('/dashboard')} className="w-full">
+            Volver al Inicio
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex min-h-screen bg-[#1f2a37] text-white">
-      {/* ─── Sidebar ─── */}
-      {usuario && usuario.rol === 'admin' ? (
-        <SidebarNavegacionAdmin />
-      ) : (
-        <SidebarNavegacionEmpleado />
-      )}
+    <div className="min-h-screen bg-background flex flex-col">
+      <Navbar usuario={usuario} />
+      
+      <div className="flex flex-1 relative">
+        <Sidebar role={usuario?.rol} />
 
-      {/* ─── Contenido principal ─── */}
-      <div className="flex-1 ml-16 p-6">
-        <h1 className="text-3xl font-bold text-yellow-400 mb-6 text-center">
-          📋 Listado de Reservas
-        </h1>
+        <main className="flex-1 p-8 lg:p-12 overflow-auto">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-7xl mx-auto"
+          >
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+              <div>
+                <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-4">
+                  <CalendarIcon className="text-primary" size={32} />
+                  Gestión de Reservas
+                </h1>
+                <p className="text-zinc-400">Administra y organiza todas las visitas de hoy.</p>
+              </div>
 
-        {/* ─── Barra de filtros + botones de orden ─── */}
-        <div className="flex flex-col md:flex-row items-center justify-between mb-6 space-y-4 md:space-y-0 md:space-x-4">
-          {/* Input de búsqueda */}
-          <input
-            type="text"
-            placeholder="Buscar por cliente o mesa…"
-            value={filtro}
-            onChange={e => setFiltro(e.target.value)}
-            className="w-full md:w-1/3 bg-gray-800 text-white px-4 py-2 rounded-md placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition"
-          />
+              <Button 
+                onClick={() => router.push('/reservas/nueva')}
+                className="px-6 py-5"
+              >
+                <Plus size={18} className="mr-2" />
+                Nueva Reserva
+              </Button>
+            </div>
 
-          {/* Botones de orden */}
-          <div className="flex items-center space-x-2">
-            {/* Ordenar por hora */}
-            <button
-              onClick={() => {
-                if (sortField === 'hora') {
-                  toggleSortDirection();
-                } else {
-                  setSortField('hora');
-                  setSortAsc(true);
-                }
-              }}
-              className={`flex items-center gap-1 px-3 py-2 rounded-md transition 
-                ${
-                  sortField === 'hora'
-                    ? 'bg-yellow-500 text-black hover:bg-yellow-400'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-            >
-              Hora
-              {sortField === 'hora' &&
-                (sortAsc ? (
-                  <FaSortAmountDown size={14} />
-                ) : (
-                  <FaSortAmountUp size={14} />
+            {/* Controls Bar */}
+            <div className="flex flex-col md:flex-row items-center gap-4 mb-8">
+              <div className="relative flex-1 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-primary transition-colors" size={18} />
+                <input 
+                  type="text"
+                  placeholder="Buscar por cliente, mesa..."
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  className="w-full bg-surface border border-white/5 rounded-2xl pl-12 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 bg-surface border border-white/5 rounded-2xl p-1 px-4 h-[46px]">
+                <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest mr-2">Ordenar:</span>
+                {[
+                  { id: 'hora', label: 'Hora' },
+                  { id: 'nombre', label: 'Cliente' },
+                  { id: 'mesa', label: 'Mesa' }
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSort(s.id)}
+                    className={clsx(
+                      "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
+                      sortField === s.id 
+                        ? "bg-primary text-black" 
+                        : "text-zinc-400 hover:text-white hover:bg-white/5"
+                    )}
+                  >
+                    {s.label}
+                    {sortField === s.id && (sortAsc ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
+                  </button>
                 ))}
-            </button>
+              </div>
+            </div>
 
-            {/* Ordenar por nombre */}
-            <button
-              onClick={() => {
-                if (sortField === 'nombre') {
-                  toggleSortDirection();
-                } else {
-                  setSortField('nombre');
-                  setSortAsc(true);
-                }
-              }}
-              className={`flex items-center gap-1 px-3 py-2 rounded-md transition 
-                ${
-                  sortField === 'nombre'
-                    ? 'bg-yellow-500 text-black hover:bg-yellow-400'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-            >
-              Cliente
-              {sortField === 'nombre' &&
-                (sortAsc ? (
-                  <FaSortAlphaDown size={14} />
-                ) : (
-                  <FaSortAlphaUp size={14} />
-                ))}
-            </button>
-          </div>
-        </div>
-
-        {/* ─── Tabla de reservas ─── */}
-        <div className="overflow-x-auto bg-gray-800 rounded-lg shadow-lg">
-          <table className="min-w-full divide-y divide-gray-700 text-sm">
-            <thead>
-              <tr className="bg-gray-900">
-                <th className="px-4 py-3 text-left text-gray-300">Hora</th>
-                <th className="px-4 py-3 text-left text-gray-300">Cliente</th>
-                <th className="px-4 py-3 text-left text-gray-300">Mesa</th>
-                <th className="px-4 py-3 text-left text-gray-300">Zona</th>
-                <th className="px-4 py-3 text-left text-gray-300">Pax</th>
-                <th className="px-4 py-3 text-left text-gray-300">Fecha</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-700">
-              {reservasOrdenadas.map((r, idx) => (
-                <tr
-                  key={idx}
-                  className="hover:bg-gray-700 transition-colors duration-200 cursor-pointer"
-                >
-                  <td className="px-4 py-3">{r.hora}</td>
-                  <td className="px-4 py-3">{r.nombre}</td>
-                  <td className="px-4 py-3">{r.mesa}</td>
-                  <td className="px-4 py-3">{r.zona}</td>
-                  <td className="px-4 py-3">{r.pax}p</td>
-                  <td className="px-4 py-3">{r.fecha}</td>
-                </tr>
-              ))}
-
+            {/* Table/List View */}
+            <Card padded={false} className="glass-effect border-white/5 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-white/5 border-b border-white/5">
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Hora</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Cliente</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-center">Mesa / Zona</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-center">Personas</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Fecha</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    <AnimatePresence mode="popLayout">
+                      {reservasOrdenadas.map((r) => (
+                        <motion.tr
+                          key={r.id}
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="hover:bg-white/[0.02] transition-colors group"
+                        >
+                          <td className="px-6 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                <Clock size={16} />
+                              </div>
+                              <span className="text-sm font-bold text-white tracking-wider">{r.hora}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-white group-hover:text-primary transition-colors">{r.nombre}</span>
+                              <span className="text-[10px] text-zinc-500 uppercase font-medium">Reserva Confirmada</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            <div className="inline-flex flex-col items-center">
+                              <span className="text-xs font-bold text-zinc-200">Mesa {r.mesa}</span>
+                              <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                <MapPin size={10} className="text-primary" /> {r.zona}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800 border border-white/5 text-xs font-bold text-zinc-300">
+                              <Users size={14} className="text-primary" />
+                              {r.pax} pax
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <span className="text-xs text-zinc-400 font-medium">{r.fecha}</span>
+                          </td>
+                          <td className="px-6 py-5">
+                            <Button variant="ghost" size="sm" className="text-xs">
+                              Detalles
+                            </Button>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </div>
+              
               {reservasOrdenadas.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
-                    No hay reservas que mostrar.
-                  </td>
-                </tr>
+                <div className="py-20 flex flex-col items-center justify-center text-zinc-500">
+                  <CalendarIcon size={48} className="mb-4 opacity-10" />
+                  <p className="text-sm">No se encontraron reservas con los filtros aplicados.</p>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            </Card>
+          </motion.div>
+        </main>
       </div>
     </div>
   );
