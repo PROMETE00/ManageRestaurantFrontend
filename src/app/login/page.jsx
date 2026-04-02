@@ -1,124 +1,150 @@
 'use client';
+
+import { api } from '@/lib/api';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import axios from 'axios';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { LogIn, Loader2, AlertCircle } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isNavigating, setIsNavigating] = useState(false); // Estado para animación
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleLogin = async e => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    
     try {
-      const response = await axios.post('http://localhost:8080/api/usuarios/login', {
+      const response = await api.post('/usuarios/login', {
         email,
         password,
       });
 
       const usuario = response.data;
       localStorage.setItem('usuario', JSON.stringify(usuario));
-
       router.push('/dashboard');
     } catch (error) {
       console.error(error);
-      alert('Email o contraseña incorrectos');
+      setError('Email o contraseña incorrectos. Por favor, inténtalo de nuevo.');
+      setIsLoading(false);
     }
   };
 
-  // Manejo de la navegación a Registro con fade‐out
-  const handleNavigateToRegister = (e) => {
-    e.preventDefault();
-    setIsNavigating(true); // Activar animación de transición
-    setTimeout(() => {
-      router.push('/register'); // Redirigir a la página de registro
-    }, 500); // El retraso de 500ms corresponde al fade-out
-  };
-
   return (
-    <div className="flex items-center justify-center min-h-screen bg-black relative">
-      <Image
-        src="/assets/ImagenesLogin/fondococina.png"
-        alt="Food Background"
-        fill
-        className="object-cover opacity-70"
-      />
+    <div className="relative min-h-screen w-full flex items-center justify-center p-4 overflow-hidden bg-background">
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/assets/ImagenesLogin/fondococina.png"
+          alt="Restaurant Background"
+          fill
+          className="object-cover opacity-40 scale-105"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
+      </div>
 
-      {/* Contenedor principal con fade-out */}
-      <div
-        className={`relative z-10 flex flex-row rounded-xl shadow-2xl overflow-hidden ${isNavigating ? 'opacity-0 transition-opacity duration-500' : ''}`}
-        style={{ height: '600px' }}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="relative z-10 w-full max-w-4xl"
       >
-        {/* Imagen lateral */}
-        <div className="h-full w-[500px]">
-          <Image
-            src="/assets/ImagenesLogin/meseroyadmin.png"
-            alt="Food"
-            width={500}
-            height={600}
-            className="object-cover h-full w-full"
-          />
-        </div>
+        <Card padded={false} className="flex flex-col md:flex-row overflow-hidden glass-effect border-white/10 shadow-2xl">
+          {/* Left Panel: Image/Branding */}
+          <div className="hidden md:block w-1/2 relative min-h-[500px]">
+            <Image
+              src="/assets/ImagenesLogin/meseroyadmin.png"
+              alt="Golden Plate Bistro"
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-primary/20 mix-blend-overlay" />
+            <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent">
+              <h1 className="text-3xl font-bold text-white mb-2">Golden Plate</h1>
+              <p className="text-zinc-200 text-sm">Gestiona tu restaurante con la elegancia que tus clientes merecen.</p>
+            </div>
+          </div>
 
-        {/* Login */}
-        <div className="w-[400px] bg-[#1a1e2a] text-white flex flex-col justify-center px-12">
-          <h2 className="text-4xl font-bold mb-8 text-center">Login</h2>
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
+          {/* Right Panel: Login Form */}
+          <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-surface/50">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-white mb-2">Bienvenido</h2>
+              <p className="text-zinc-400 text-sm">Ingresa tus credenciales para acceder al panel.</p>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-6 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-xs"
+                >
+                  <AlertCircle size={16} />
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              <Input
+                label="Correo Electrónico"
                 type="email"
+                placeholder="nombre@ejemplo.com"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="block w-full rounded-md bg-gray-800 px-3 py-2 text-base text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
               />
-            </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
+              <Input
+                label="Contraseña"
                 type="password"
+                placeholder="••••••••"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="block w-full rounded-md bg-gray-800 px-3 py-2 text-base text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
               />
+
+              <Button
+                type="submit"
+                className="w-full py-6"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="animate-spin mr-2" size={18} />
+                ) : (
+                  <LogIn className="mr-2" size={18} />
+                )}
+                {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              </Button>
+            </form>
+
+            <div className="mt-8 text-center">
+              <p className="text-zinc-500 text-sm">
+                ¿No tienes una cuenta?{' '}
+                <Link
+                  href="/register"
+                  className="text-primary font-semibold hover:underline transition-all"
+                >
+                  Regístrate aquí
+                </Link>
+              </p>
             </div>
-
-            <button
-              type="submit"
-              className="w-full rounded-md bg-orange-600 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
-            >
-              Sign in
-            </button>
-          </form>
-
-          <p className="mt-8 text-center text-gray-400">
-            No tienes cuenta?{' '}
-            <Link
-              href="/register"
-              onClick={handleNavigateToRegister} // Añadimos el evento de clic aquí
-              className="text-orange-600 font-semibold"
-            >
-              Registrarse
-            </Link>
-          </p>
-        </div>
-      </div>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 }

@@ -1,292 +1,292 @@
 'use client';
+
+import { api } from '@/lib/api';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import axios from 'axios';
+import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { UserPlus, Loader2, AlertCircle, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
+
+const slides = [
+  {
+    src: '/assets/ImagenesLogin/newe.png',
+    alt: 'Nuestro equipo',
+    title: 'Únete a la Familia',
+    description: 'Forma parte del equipo que hace posible la magia en Golden Plate.',
+  },
+  {
+    src: '/assets/ImagenesLogin/vision.png',
+    alt: 'Nuestra Visión',
+    title: 'Visión de Excelencia',
+    description: 'Buscamos ser el referente en gastronomía y servicio de alta calidad.',
+  },
+  {
+    src: '/assets/ImagenesLogin/mision.png',
+    alt: 'Nuestra Misión',
+    title: 'Misión de Sabor',
+    description: 'Crear experiencias memorables a través de sabores auténticos.',
+  },
+  {
+    src: '/assets/ImagenesLogin/reglas1.png',
+    alt: 'Nuestros Estándares',
+    title: 'Altos Estándares',
+    description: 'La calidad y el orden son la base de nuestro éxito diario.',
+  },
+];
 
 export default function Register() {
   const router = useRouter();
-
-  // Estados para el formulario
-  const [nombre, setNombre] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [rol, setRol] = useState('empleado');
-  const [isNavigating, setIsNavigating] = useState(false);
-
-  // Estado para el slider
+  const [formData, setFormData] = useState({
+    nombre: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    rol: 'empleado',
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  const slides = [
-    // SLIDE 0: Imagen “Mesero y Administrador”
-    {
-      type: 'image',
-      src: '/assets/ImagenesLogin/newe.png',
-      alt: 'Mesero y Administrador saludando',
-    },
-    // SLIDE 1: Visión (imagen)
-    {
-      type: 'image',
-      src: '/assets/ImagenesLogin/vision.png',
-      alt: 'Imagen de Visión del Restaurante',
-    },
-    
-    {
-      type: 'image',
-      src: '/assets/ImagenesLogin/mision.png',
-      alt: 'Imagen de Misión del Restaurante',
-    },
-   
-    // SLIDE 3: Reglas Básicas (imagen)
-    {
-      type: 'image',
-      src: '/assets/ImagenesLogin/reglas1.png',
-      alt: 'Cartel con Reglas Básicas del Restaurante',
-    },
-
-    // SLIDE 4: Bienvenida (imagen)
-    {
-      type: 'image',
-      src: '/assets/ImagenesLogin/bienvenido.png',
-      alt: 'Bienvenido al Restaurante, trabajadores saludando',
-    },
-    
-  ];
-
-  // Función para pasar a la siguiente diapositiva 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % slides.length);
-  };
-
-  // Función para retroceder a la diapositiva anterior 
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
-  };
-
-  // Auto‐desplazamiento: cambia de slide
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
-    }, 2000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // Manejo del registro
-  const handleRegister = async (e) => {
-    e.preventDefault();
-
-    if (!nombre || !email || !password || !confirmPassword || !rol) {
-      alert('❌ Todos los campos son obligatorios.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      alert('❌ Las contraseñas no coinciden.');
-      return;
-    }
-
-    try {
-      await axios.post('http://localhost:8080/api/usuarios', {
-        nombre,
-        email,
-        password,
-        rol,
-      });
-      alert('✅ Registro exitoso');
-      setIsNavigating(true);
-      setTimeout(() => {
-        router.push('/login');
-      }, 500);
-    } catch (error) {
-      console.error(error);
-      alert('❌ Error al registrar usuario');
-    }
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Manejo de la navegación a Login con fade‐out
-  const handleNavigateToLogin = (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
-    setIsNavigating(true);
-    setTimeout(() => {
-      router.push('/login');
-    }, 500);
+    setError('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await api.post('/usuarios', {
+        nombre: formData.nombre,
+        email: formData.email,
+        password: formData.password,
+        rol: formData.rol,
+      });
+      setSuccess(true);
+      setTimeout(() => {
+        router.push('/login');
+      }, 2000);
+    } catch (error) {
+      console.error(error);
+      setError('Error al registrar usuario. El correo podría ya estar en uso.');
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div
-      className={`fixed inset-0 flex items-center justify-center bg-black transition-opacity duration-500 ${
-        isNavigating ? 'opacity-0' : 'opacity-100'
-      }`}
-    >
-      {/* Imagen de fondo de toda la pantalla */}
-      <Image
-        src="/assets/ImagenesLogin/newe.png"
-        alt="Fondo de comedor"
-        fill
-        className="object-cover opacity-70"
-      />
+    <div className="relative min-h-screen w-full flex items-center justify-center p-4 overflow-hidden bg-background">
+      {/* Background Image Overlay */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/assets/ImagenesLogin/newe.png"
+          alt="Background"
+          fill
+          className="object-cover opacity-30 blur-sm scale-110"
+        />
+        <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px]" />
+      </div>
 
-      {/* Contenedor central: 900px ancho x 600px alto */}
-      <div
-        className="relative z-10 flex flex-row rounded-xl shadow-2xl overflow-hidden"
-        style={{ width: '900px', height: '600px' }}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="relative z-10 w-full max-w-5xl"
       >
-        {/* ================================
-            PANEL IZQUIERDO: SLIDER (450px de ancho)
-            ================================ */}
-        <div className="relative h-full w-[450px] bg-gray-900">
-          {/* Botón “Anterior” */}
-          <button
-            onClick={prevSlide}
-            className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 z-20"
-            aria-label="Anterior"
-          >
-            ‹
-          </button>
+        <Card padded={false} className="flex flex-col lg:flex-row overflow-hidden glass-effect border-white/10 shadow-2xl min-h-[650px]">
+          
+          {/* Slider Panel */}
+          <div className="hidden lg:block w-1/2 relative bg-zinc-950 overflow-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentSlide}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.7, ease: "easeInOut" }}
+                className="absolute inset-0"
+              >
+                <Image
+                  src={slides[currentSlide].src}
+                  alt={slides[currentSlide].alt}
+                  fill
+                  className="object-cover opacity-60"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                <div className="absolute bottom-12 left-10 right-10">
+                  <motion.h3 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                    className="text-3xl font-bold text-white mb-4"
+                  >
+                    {slides[currentSlide].title}
+                  </motion.h3>
+                  <motion.p 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-zinc-300 text-lg leading-relaxed"
+                  >
+                    {slides[currentSlide].description}
+                  </motion.p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
 
-          {/* Contenedor relativo para que <Image fill> cubra todo el espacio */}
-          <div className="relative h-full w-full">
-            {slides[currentSlide].type === 'image' ? (
-              <Image
-                src={slides[currentSlide].src}
-                alt={slides[currentSlide].alt}
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-white text-center">
-                <h3 className="text-2xl font-semibold">{slides[currentSlide].title}</h3>
-                <p className="whitespace-pre-line mt-4">{slides[currentSlide].content}</p>
+            {/* Slider Controls */}
+            <div className="absolute bottom-6 left-10 flex gap-2">
+              {slides.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentSlide(idx)}
+                  className={`h-1.5 transition-all duration-300 rounded-full ${
+                    idx === currentSlide ? 'w-8 bg-primary' : 'w-2 bg-white/20'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Form Panel */}
+          <div className="w-full lg:w-1/2 p-8 lg:p-12 flex flex-col bg-surface/30">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-white mb-2">Crear Cuenta</h2>
+              <p className="text-zinc-400 text-sm">Regístrate para comenzar a gestionar el restaurante.</p>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400 text-sm"
+                >
+                  <AlertCircle size={18} />
+                  {error}
+                </motion.div>
+              )}
+              {success && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-3 text-green-400 text-sm"
+                >
+                  <CheckCircle2 size={18} />
+                  Registro exitoso. Redirigiendo...
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleRegister} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="md:col-span-2">
+                <Input
+                  label="Nombre Completo"
+                  name="nombre"
+                  placeholder="Ej: Juan Pérez"
+                  value={formData.nombre}
+                  onChange={handleChange}
+                  required
+                />
               </div>
-            )}
-          </div>
 
-          {/* Botón “Siguiente” */}
-          <button
-            onClick={nextSlide}
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 z-20"
-            aria-label="Siguiente"
-          >
-            ›
-          </button>
+              <div className="md:col-span-2">
+                <Input
+                  label="Correo Electrónico"
+                  name="email"
+                  type="email"
+                  placeholder="juan@goldenplate.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
 
-          {/* Indicadores (puntos) */}
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-            {slides.map((_, idx) => (
-              <span
-                key={idx}
-                className={`block h-2 w-2 rounded-full ${
-                  idx === currentSlide ? 'bg-white' : 'bg-gray-500'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* ================================
-            PANEL DERECHO: FORMULARIO DE REGISTRO (450px de ancho)
-            ================================ */}
-        <div className="w-[450px] bg-[#1a1e2a] text-white flex flex-col justify-center px-12">
-          <h2 className="text-4xl font-bold mb-6 text-center">Registro</h2>
-          <form onSubmit={handleRegister} className="space-y-5">
-            <div>
-              <label htmlFor="nombre" className="block text-sm font-medium text-gray-300">
-                Nombre
-              </label>
-              <input
-                id="nombre"
-                name="nombre"
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                required
-                className="mt-1 block w-full rounded-md bg-gray-800 px-3 py-2 text-base text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                className="mt-1 block w-full rounded-md bg-gray-800 px-3 py-2 text-base text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300">
-                Contraseña
-              </label>
-              <input
-                id="password"
+              <Input
+                label="Contraseña"
                 name="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleChange}
                 required
-                className="mt-1 block w-full rounded-md bg-gray-800 px-3 py-2 text-base text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
               />
-            </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300">
-                Confirmar Contraseña
-              </label>
-              <input
-                id="confirmPassword"
+              <Input
+                label="Confirmar"
                 name="confirmPassword"
                 type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                value={formData.confirmPassword}
+                onChange={handleChange}
                 required
-                className="mt-1 block w-full rounded-md bg-gray-800 px-3 py-2 text-base text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
               />
+
+              <div className="md:col-span-2 flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-zinc-400 ml-1 uppercase tracking-wider">
+                  Rol en el Restaurante
+                </label>
+                <select
+                  name="rol"
+                  value={formData.rol}
+                  onChange={handleChange}
+                  className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-primary/40 focus:outline-none appearance-none cursor-pointer"
+                >
+                  <option value="admin">Administrador</option>
+                  <option value="empleado">Empleado</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2 pt-2">
+                <Button
+                  type="submit"
+                  className="w-full py-6"
+                  disabled={isLoading || success}
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin mr-2" size={18} />
+                  ) : (
+                    <UserPlus className="mr-2" size={18} />
+                  )}
+                  {isLoading ? 'Registrando...' : 'Crear Cuenta'}
+                </Button>
+              </div>
+            </form>
+
+            <div className="mt-8 text-center">
+              <p className="text-zinc-500 text-sm">
+                ¿Ya tienes una cuenta?{' '}
+                <Link
+                  href="/login"
+                  className="text-primary font-semibold hover:underline"
+                >
+                  Inicia sesión aquí
+                </Link>
+              </p>
             </div>
-
-            <div>
-              <label htmlFor="rol" className="block text-sm font-medium text-gray-300">
-                Rol
-              </label>
-              <select
-                id="rol"
-                name="rol"
-                value={rol}
-                onChange={(e) => setRol(e.target.value)}
-                required
-                className="mt-1 block w-full rounded-md bg-gray-800 px-3 py-2 text-base text-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-600"
-              >
-                <option value="admin">Administrador</option>
-                <option value="empleado">Empleado</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full rounded-md bg-orange-600 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-600"
-            >
-              Crear cuenta
-            </button>
-          </form>
-
-          <p className="mt-6 text-center text-gray-400">
-            ¿Ya tienes cuenta?{' '}
-            <a
-              href="#"
-              onClick={handleNavigateToLogin}
-              className="text-orange-600 font-semibold cursor-pointer"
-            >
-              Iniciar sesión
-            </a>
-          </p>
-        </div>
-      </div>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 }
