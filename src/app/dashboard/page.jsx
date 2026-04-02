@@ -1,55 +1,54 @@
 'use client';
 
+import { api } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
-import { FaUserCircle } from 'react-icons/fa'; // Corrected import for UserCircle
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Map, Info, Calendar as CalendarIcon, Users as UsersIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import SidebarNavegacionAdmin from '@/components/SideBarNavegacionAdmin';
-import SidebarNavegacionEmpleado from '@/components/SideBarNavegacionEmpleado';
+import { Card } from '@/components/ui/card';
+import { Navbar } from '@/components/layout/Navbar';
+import SidebarAdmin from '@/components/SideBarNavegacionAdmin';
+import SidebarEmpleado from '@/components/SideBarNavegacionEmpleado';
+import { clsx } from 'clsx';
 
-function clasePorEstado(estado) {
+function getMesaStyles(estado) {
   switch (estado) {
     case 'libre':
-      return 'bg-green-400 hover:bg-green-500';
+      return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/40';
     case 'reservada':
-      return 'bg-yellow-400 hover:bg-yellow-500';
+      return 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20 hover:border-amber-500/40';
     case 'ocupada':
-      return 'bg-red-400 hover:bg-red-500';
+      return 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20 hover:border-rose-500/40';
     case 'atendida':
-      return 'bg-blue-400 hover:bg-blue-500';
+      return 'bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20 hover:border-sky-500/40';
     default:
-      return 'bg-gray-400 hover:bg-gray-500';
+      return 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:bg-zinc-700';
   }
 }
 
 export default function DashboardLayout() {
   const [usuario, setUsuario] = useState(null);
   const [reservas, setReservas] = useState([]);
-  const [mesasEstado, setMesasEstado] = useState({}); // { numeroMesa: estadoString }
-  const [horaActual, setHoraActual] = useState(new Date());
+  const [mesasEstado, setMesasEstado] = useState({});
   const router = useRouter();
 
-  /* ——— Cargar usuario desde localStorage ——— */
   useEffect(() => {
     const userJson = localStorage.getItem('usuario');
     if (userJson) {
       setUsuario(JSON.parse(userJson));
     } else {
-      // Si no hay usuario logueado, redirigir a la página de login
       router.push('/login');
     }
   }, [router]);
 
-  /* ——— Cargar reservas (para hora + pax) ——— */
   useEffect(() => {
-    axios
-      .get('http://localhost:8080/api/reservas')
+    api.get('/reservas')
       .then((res) => {
         const data = res.data.map((r) => ({
-          hora: r.hora?.slice(0, 5) + 'h',
+          hora: r.hora?.slice(0, 5),
           pax: r.cantidad,
-          mesa: r.mesa?.numero, // Asegúrate de que tu JSON tenga “numero”
+          mesa: r.mesa?.numero,
           zona: r.mesa?.ubicacion ?? 'Desconocida',
           nombre: r.cliente?.nombre ?? 'Sin nombre',
         }));
@@ -58,10 +57,8 @@ export default function DashboardLayout() {
       .catch((err) => console.error('Error al obtener reservas:', err));
   }, []);
 
-  /* ——— Cargar estado de mesas ——— */
   useEffect(() => {
-    axios
-      .get('http://localhost:8080/api/mesas')
+    api.get('/mesas')
       .then((res) => {
         const nuevoMapa = {};
         res.data.forEach((m) => {
@@ -72,127 +69,129 @@ export default function DashboardLayout() {
       .catch((err) => console.error('Error cargando estados de mesas:', err));
   }, []);
 
-  /* ——— Reloj en vivo y turno dinámico ——— */
-  useEffect(() => {
-    const timerId = setInterval(() => {
-      setHoraActual(new Date());
-    }, 1000);
-    return () => clearInterval(timerId);
-  }, []);
-
-  const formatoHora = horaActual.toLocaleTimeString('es-ES', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-  const horaNum = horaActual.getHours();
-  let turno = '';
-  if (horaNum < 6) turno = 'Madrugada';
-  else if (horaNum < 12) turno = 'Mañana';
-  else if (horaNum < 18) turno = 'Tarde';
-  else turno = 'Noche';
-
   return (
-    <div className="min-h-screen bg-[#1f1f2e] text-white flex flex-col">
-      {/* NAVBAR SUPERIOR */}
-      <nav className="w-full bg-gradient-to-r from-purple-900 to-blue-900 py-3 px-6 flex justify-between items-center shadow-md relative">
-        <div className="flex items-center gap-3 absolute left-4 cursor-pointer hover:opacity-80 transition-opacity duration-300">
-          <FaUserCircle size={28} className="text-white" /> {/* Corrected icon */}
-          {usuario && (
-            <span className="text-white text-base font-semibold">
-              {usuario.nombre}
-            </span>
-          )}
+    <div className="min-h-screen bg-background flex flex-col">
+      <Navbar usuario={usuario} />
+      
+      <div className="flex flex-1 relative">
+        {/* Sidebar wrapper */}
+        <div className="w-20 lg:w-20 transition-all duration-300">
+          {usuario?.rol === 'admin' ? <SidebarAdmin /> : <SidebarEmpleado />}
         </div>
 
-        <h1 className="text-xl font-bold text-yellow-300 text-center mx-auto">
-          🍽️ Golden Plate Bistro
-        </h1>
-
-        <div className="flex items-center space-x-4">
-          <Button
-            onClick={() => router.push('/reservas/nueva')}
-            className="bg-yellow-400 text-black font-semibold hover:bg-yellow-300"
+        {/* Main Content */}
+        <main className="flex-1 p-8 overflow-auto">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-7xl mx-auto"
           >
-            ➕ Nueva Reserva
-          </Button>
-          <div className="flex flex-col items-end text-sm">
-            <span className="text-white font-semibold">{formatoHora}</span>
-            <span className="text-gray-300 italic text-xs">{turno}</span>
-          </div>
-        </div>
-      </nav>
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                  <Map className="text-primary" size={28} />
+                  Plano del Restaurante
+                </h2>
+                <p className="text-zinc-400 text-sm">Gestiona la ocupación y reservas en tiempo real.</p>
+              </div>
 
-      <div className="flex-1 relative">
-        {/* SIDEBAR LATERAL */}
-        <div className="group absolute left-0 top-1/2 -translate-y-1/2 z-20">
-          {usuario && usuario.rol === 'admin' ? (
-            <SidebarNavegacionAdmin />
-          ) : (
-            <SidebarNavegacionEmpleado />
-          )}
-        </div>
+              <div className="flex items-center gap-3">
+                <Button 
+                  onClick={() => router.push('/reservas/nueva')}
+                  className="px-6 py-5"
+                >
+                  <Plus size={18} className="mr-2" />
+                  Nueva Reserva
+                </Button>
+              </div>
+            </div>
 
-        {/* CONTENIDO – Plano del restaurante */}
-        <main className="ml-16 p-6">
-          <header className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl lg:text-3xl font-bold text-white">
-              Plano del Restaurante
-            </h2>
-          </header>
+            {/* Status Legend */}
+            <Card className="mb-8 p-4 flex flex-wrap items-center gap-6 bg-surface/30 border-white/5">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Estado:</span>
+              {[
+                { label: 'Libre', color: 'bg-emerald-500' },
+                { label: 'Reservada', color: 'bg-amber-500' },
+                { label: 'Ocupada', color: 'bg-rose-500' },
+                { label: 'Atendida', color: 'bg-sky-500' },
+              ].map((status) => (
+                <div key={status.label} className="flex items-center gap-2">
+                  <div className={clsx("w-2 h-2 rounded-full", status.color)} />
+                  <span className="text-xs text-zinc-300 font-medium">{status.label}</span>
+                </div>
+              ))}
+            </Card>
 
-          <div className="grid grid-cols-7 gap-3 auto-rows-[75px] justify-items-center items-center">
-            {[
-              'tree', 'tree', 'mesa-1', 'tree', 'mesa-2', 'tree', 'tree',
-              'mesa-3', 'mesa-4', 'bloque', 'mesa-5', 'mesa-6', 'mesa-7',
-              'bloque', 'bloque', 'mesa-8', 'bloque', 'bloque', 'mesa-9',
-              'sombrilla', 'tree', 'sombrilla', 'tree', 'sombrilla', 'tree',
-              'mesa-10', 'bloque', 'bloque', 'bloque', 'bloque',
-            ].map((item, i) => {
-              if (item.startsWith('mesa')) {
-                const numeroMesa = parseInt(item.split('-')[1], 10);
-                const estado = mesasEstado[numeroMesa] ?? 'libre';
-                const reservaMesa = reservas.find((r) => r.mesa === numeroMesa);
+            {/* Grid Layout */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4 auto-rows-[100px]">
+              {[
+                'tree', 'tree', 'mesa-1', 'tree', 'mesa-2', 'tree', 'tree',
+                'mesa-3', 'mesa-4', 'bloque', 'mesa-5', 'mesa-6', 'mesa-7',
+                'bloque', 'bloque', 'mesa-8', 'bloque', 'bloque', 'mesa-9',
+                'sombrilla', 'tree', 'sombrilla', 'tree', 'sombrilla', 'tree',
+                'mesa-10', 'bloque', 'bloque', 'bloque', 'bloque',
+              ].map((item, i) => {
+                if (item.startsWith('mesa')) {
+                  const numeroMesa = parseInt(item.split('-')[1], 10);
+                  const estado = mesasEstado[numeroMesa] ?? 'libre';
+                  const reservaMesa = reservas.find((r) => r.mesa === numeroMesa);
+
+                  return (
+                    <motion.div
+                      key={i}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => router.push(`/mesas/${numeroMesa}`)}
+                      className={clsx(
+                        "cursor-pointer w-full h-full rounded-2xl flex flex-col items-center justify-center border transition-all duration-300 relative overflow-hidden group shadow-lg",
+                        getMesaStyles(estado)
+                      )}
+                    >
+                      <span className="text-xs uppercase tracking-tighter font-black opacity-60">Mesa</span>
+                      <span className="text-xl font-bold">{numeroMesa}</span>
+                      
+                      {reservaMesa && (
+                        <div className="mt-1 flex flex-col items-center">
+                          <div className="flex items-center gap-1 text-[10px] font-bold">
+                            <CalendarIcon size={10} />
+                            {reservaMesa.hora}
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] font-bold">
+                            <UsersIcon size={10} />
+                            {reservaMesa.pax}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Glass shine effect on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                    </motion.div>
+                  );
+                }
+
+                const iconos = {
+                  tree: '/assets/icons/tree-svgrepo-com.svg',
+                  bloque: '/assets/icons/chair-svgrepo-com.svg',
+                  sombrilla: '/assets/icons/umbrella-sea-svgrepo-com.svg',
+                };
 
                 return (
-                  <div
-                    key={i}
-                    onClick={() => router.push(`/mesas/${numeroMesa}`)}
-                    className={`
-                      cursor-pointer w-full h-full rounded-lg flex flex-col items-center justify-center font-bold text-xs text-black text-center p-1 transition-colors duration-300
-                      ${clasePorEstado(estado)}
-                    `}
-                  >
-                    <span className="leading-tight">Mesa {numeroMesa}</span>
-                    {reservaMesa && (
-                      <div className="mt-1 space-y-1">
-                        <span className="text-[10px]">{reservaMesa.hora}</span>
-                        <span className="text-[10px]">{reservaMesa.pax} p</span>
-                      </div>
+                  <div key={i} className="w-full h-full flex justify-center items-center">
+                    {iconos[item] && (
+                      <motion.img
+                        initial={{ opacity: 0.3 }}
+                        whileHover={{ opacity: 0.6, scale: 1.1 }}
+                        src={iconos[item]}
+                        alt={item}
+                        className="w-10 h-10 object-contain grayscale brightness-200 opacity-20 transition-all"
+                      />
                     )}
                   </div>
                 );
-              }
-
-              const iconos = {
-                tree: '/assets/icons/tree-svgrepo-com.svg',
-                bloque: '/assets/icons/chair-svgrepo-com.svg',
-                sombrilla: '/assets/icons/umbrella-sea-svgrepo-com.svg',
-              };
-
-              return (
-                <div key={i} className="w-full h-full flex justify-center items-center">
-                  {iconos[item] && (
-                    <img
-                      src={iconos[item]}
-                      alt={item}
-                      className="w-8 h-8 object-contain opacity-70"
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+              })}
+            </div>
+          </motion.div>
         </main>
       </div>
     </div>
