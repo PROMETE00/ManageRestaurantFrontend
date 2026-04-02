@@ -1,70 +1,138 @@
-# 🍽️ Restaurant Management Frontend
+# 🌐 Restaurant Frontend
 
-## You can support me at
-https://coff.ee/prome
+Aplicación web Next.js para gestión de restaurante con Cloudflare Tunnel
 
-This is the frontend for a restaurant management system.  
-It is built using **Next.js**, **React**, and **TailwindCSS**.
+## 🚀 Despliegue Rápido
 
-## ✅ Features
+### 1️⃣ Clonar o hacer pull del proyecto
 
-- 👤 Login and register
-- 🧾 View and manage orders (tickets)
-- 🍽️ See and edit meals and products
-- 🪑 Manage tables individually
-- 👨‍🍳 Add new employees (admin only)
-- 🔐 Route protection (admin and employee)
-- 📊 Admin and employee dashboards
-- 📦 Product CRUD (Create, Read, Update, Delete)
-- 🧭 Sidebar for admin and another for employees
+```bash
+git pull origin main
+```
 
-## 🛠️ Tech Stack
+### 2️⃣ Configurar variables de entorno
 
-- **Next.js** (App Router)
-- **React**
-- **TailwindCSS**
-- **JavaScript**
-- **Context API** (for state and auth management)
-- **CSS Modules / Global styles**
+```bash
+# Copiar plantilla
+cp .env.example .env
 
-## 📁 Project Structure
+# Editar y pegar tu token de Cloudflare
+nano .env
+```
 
-- `src/app/` – Pages and routes (e.g. `/login`, `/dashboard`, `/mesas/[id]`)
-- `src/components/` – Reusable UI components
-- `src/components/ui/` – Admin and employee sidebars
-- `page.jsx` – Main pages
-- `layout.js` – Global layout and auth wrapper
-- `globals.css` – Tailwind base styles
+**Configurar en `.env`:**
+```env
+CLOUDFLARED_TOKEN_FRONTEND=tu_token_aqui
+PUBLIC_API_URL=https://restaurantebackend.prome.works
+```
 
-## 🚀 How to Run
+### 3️⃣ Levantar servicios
 
+```bash
+docker-compose up -d --build
+```
+
+### 4️⃣ Verificar estado
+
+```bash
+# Ver logs
+docker-compose logs -f
+
+# Verificar contenedores
+docker ps
+
+# Probar frontend localmente
+curl http://localhost:3006
+```
+
+## 🌐 Acceso Público
+
+- **Frontend Web:** https://restaurante.prome.works
+- **Puerto local:** http://localhost:3006
+
+## 📦 Stack Tecnológico
+
+- **Next.js 15** (React 19)
+- **Node.js 20**
+- **Docker** + Docker Compose
+- **Cloudflare Tunnel** (Zero Trust)
+
+## 🛠️ Comandos Útiles
+
+```bash
+# Detener servicios
+docker-compose down
+
+# Ver logs del frontend
+docker-compose logs -f frontend
+
+# Reconstruir solo el frontend
+docker-compose up -d --build frontend
+
+# Entrar al contenedor
+docker exec -it restaurant_web sh
+```
+
+## 🔐 Seguridad
+
+- **NO** commitear el archivo `.env` (ya está en `.gitignore`)
+- Tokens de Cloudflare se gestionan vía variables de entorno
+- La variable `NEXT_PUBLIC_API_URL` es pública (se expone al navegador)
+
+## 🔗 Integración con Backend
+
+El frontend se conecta al backend mediante:
+- **Variable de entorno:** `NEXT_PUBLIC_API_URL`
+- **Valor por defecto:** `https://restaurantebackend.prome.works`
+
+⚠️ **IMPORTANTE:** Asegúrate de que el backend esté desplegado primero.
+
+## 🐛 Troubleshooting
+
+**Problema:** Tunnel no conecta
+```bash
+# Ver logs del tunnel
+docker logs tunnel_frontend
+
+# Verificar token
+echo $CLOUDFLARED_TOKEN_FRONTEND
+```
+
+**Problema:** Build falla
+```bash
+# Ver logs completos
+docker-compose logs frontend
+
+# Reconstruir desde cero
+docker-compose down
+docker-compose build --no-cache frontend
+docker-compose up -d
+```
+
+**Problema:** No conecta con el backend
+```bash
+# Verificar variable de entorno
+docker exec restaurant_web env | grep API_URL
+
+# Probar desde el contenedor
+docker exec restaurant_web wget -O- $NEXT_PUBLIC_API_URL/api/health
+```
+
+## 📝 Desarrollo Local
+
+Si quieres desarrollar sin Docker:
+
+```bash
+# Instalar dependencias
 npm install
+
+# Crear .env.local
+echo "NEXT_PUBLIC_API_URL=http://localhost:8081" > .env.local
+
+# Modo desarrollo
 npm run dev
 
-
-🔐 Route Protection
-
-Routes are protected depending on user role:
-
-Admins can access everything (including employee management)
-
-Employees can access only their dashboard, tables, and orders
-
-🎨 UI Screens
-
-Login / Register pages
-
-Dashboard
-
-Table view
-
-Orders view
-
-Products: Add / Edit / List
-
-Admin-only employee management
-
-📫 Author
-
-Made by a systems engineering student for restaurant use.
-Easily connect this frontend with a Spring Boot backend API.
+# Build para producción
+npm run build
+npm start
+```

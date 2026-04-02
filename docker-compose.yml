@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: restaurant_web
+    restart: unless-stopped
+    environment:
+      # URL pública de tu API (ej: https://api.tusitio.com)
+      - NEXT_PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "3006:3000"
+
+  cloudflared-frontend:
+    image: cloudflare/cloudflared:latest
+    container_name: tunnel_frontend
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARED_TOKEN_FRONTEND}
